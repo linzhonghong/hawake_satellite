@@ -8,5 +8,5 @@
   "documentation": "https://github.com/linzhonghong/hawake_satellite",
   "integration_type": "device",
   "iot_class": "local_push",
-  "version": "0.2.3"
+  "version": "0.2.4"
 }

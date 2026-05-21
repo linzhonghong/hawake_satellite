@@ -53,6 +53,7 @@ from .const import (
     SatelliteClientState,
 )
 from .coordinator import SatelliteCoordinator
+from .pipeline_events import extract_tts_output
 from .playback import PlaybackRequest, PlaybackRouter
 
 
@@ -110,7 +111,18 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
 
     def on_pipeline_event(self, event) -> None:
         """Handle HA Assist pipeline state updates."""
-        return None
+        tts_output = extract_tts_output(event)
+        if tts_output is None:
+            return
+        session_id = getattr(event, "run_id", None) or uuid4().hex
+        self.hass.async_create_task(
+            self._play_media(
+                session_id=session_id,
+                media_url=tts_output.media_url,
+                mime_type=tts_output.mime_type,
+                response_text=tts_output.response_text,
+            )
+        )
 
     async def async_accept_android_wake(self, session_id: str, wake_phrase: str) -> None:
         """Run HA Assist from Android wake-word audio."""
