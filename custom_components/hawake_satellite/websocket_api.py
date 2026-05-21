@@ -49,6 +49,11 @@ def handle_subscribe_payload(
     return coordinator.subscribe_downlinks(device_id.strip(), send_event)
 
 
+def _connection_id(connection: websocket_api.ActiveConnection) -> str:
+    """Return a stable id for this WebSocket connection."""
+    return str(getattr(connection, "id", None) or id(connection))
+
+
 @callback
 def async_register_websocket_api(
     hass: HomeAssistant,
@@ -85,7 +90,7 @@ def ws_register(
 ) -> None:
     """Handle Android client registration."""
     coordinator: SatelliteCoordinator = hass.data[DOMAIN]["coordinator"]
-    result = handle_register_payload(coordinator, msg, connection.id)
+    result = handle_register_payload(coordinator, msg, _connection_id(connection))
     connection.send_result(msg["id"], result)
 
 
@@ -123,6 +128,7 @@ def ws_subscribe(
     """Subscribe Android client to HA downlink commands."""
     coordinator: SatelliteCoordinator = hass.data[DOMAIN]["coordinator"]
     subscription_id = msg["id"]
+    connection_id = _connection_id(connection)
 
     def _send_event(payload: dict[str, Any]) -> None:
         connection.send_message({"id": subscription_id, "type": "event", "event": payload})
@@ -131,7 +137,7 @@ def ws_subscribe(
     if hasattr(connection, "subscriptions"):
         connection.subscriptions[subscription_id] = lambda: (
             unsubscribe(),
-            coordinator.disconnect(connection.id),
+            coordinator.disconnect(connection_id),
         )
     connection.send_result(subscription_id)
 
