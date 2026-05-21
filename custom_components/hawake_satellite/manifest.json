@@ -1,0 +1,12 @@
+{
+  "domain": "hawake_satellite",
+  "name": "HAWake Satellite",
+  "after_dependencies": ["assist_pipeline", "assist_satellite", "conversation", "http", "media_player", "tts", "websocket_api"],
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["assist_pipeline", "assist_satellite", "conversation", "http", "websocket_api"],
+  "documentation": "https://github.com/linzhonghong/hawake_satellite",
+  "integration_type": "device",
+  "iot_class": "local_push",
+  "version": "0.2.0"
+}

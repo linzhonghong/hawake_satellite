@@ -1,0 +1,6 @@
+{
+  "name": "HAWake Satellite",
+  "render_readme": true,
+  "domains": ["assist_satellite"],
+  "homeassistant": "2025.12.0"
+}

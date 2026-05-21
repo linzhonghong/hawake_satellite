@@ -1,0 +1,18 @@
+playback_finished:
+  fields:
+    session_id:
+      required: true
+      selector:
+        text:
+    status:
+      required: false
+      default: success
+      selector:
+        select:
+          options:
+            - success
+            - error
+    message:
+      required: false
+      selector:
+        text:

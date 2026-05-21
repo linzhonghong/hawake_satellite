@@ -1,0 +1,22 @@
+{
+  "title": "HAWake Satellite",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add HAWake Satellite",
+        "data": {
+          "device_id": "Android device id",
+          "device_name": "Satellite name",
+          "playback_mode": "Playback mode",
+          "media_player_entity_id": "Media player entity",
+          "playback_script_entity_id": "Playback script entity",
+          "pipeline_id": "Assist pipeline id"
+        }
+      }
+    },
+    "error": {
+      "missing_media_player": "Media player entity is required for media player playback.",
+      "missing_script": "Script entity is required for automation playback."
+    }
+  }
+}
