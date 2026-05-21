@@ -6,9 +6,18 @@ import asyncio
 from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Callable
+from uuid import UUID
 
 from .const import SatelliteClientState
 from .protocol import RegisterMessage
+
+
+def normalize_session_id(session_id: str) -> str:
+    """Normalize UUID-like session ids to compact hex."""
+    try:
+        return UUID(session_id).hex
+    except ValueError:
+        return session_id
 
 
 @dataclass
@@ -122,29 +131,39 @@ class SatelliteCoordinator:
 
     def start_session(self, session_id: str, device_id: str) -> None:
         """Record which Android device owns a session."""
+        session_id = normalize_session_id(session_id)
         self.device_id_by_session[session_id] = device_id
         self.audio_queues_by_session[session_id] = asyncio.Queue()
 
     def finish_session(self, session_id: str) -> None:
         """Forget a completed or cancelled session."""
+        session_id = normalize_session_id(session_id)
         self.device_id_by_session.pop(session_id, None)
         self.audio_queues_by_session.pop(session_id, None)
 
     def device_for_session(self, session_id: str) -> str | None:
         """Return the Android device id that owns a session."""
-        return self.device_id_by_session.get(session_id)
+        return self.device_id_by_session.get(normalize_session_id(session_id))
 
-    async def push_audio(self, session_id: str, pcm: bytes) -> None:
+    async def push_audio(self, session_id: str, pcm: bytes) -> bool:
         """Push a PCM chunk into a session's audio queue."""
-        await self.audio_queues_by_session[session_id].put(pcm)
+        queue = self.audio_queues_by_session.get(normalize_session_id(session_id))
+        if queue is None:
+            return False
+        await queue.put(pcm)
+        return True
 
-    async def finish_audio(self, session_id: str) -> None:
+    async def finish_audio(self, session_id: str) -> bool:
         """Signal that a session's audio stream has ended."""
-        await self.audio_queues_by_session[session_id].put(None)
+        queue = self.audio_queues_by_session.get(normalize_session_id(session_id))
+        if queue is None:
+            return False
+        await queue.put(None)
+        return True
 
     async def audio_stream(self, session_id: str):
         """Yield PCM chunks for a session until the stream ends."""
-        queue = self.audio_queues_by_session[session_id]
+        queue = self.audio_queues_by_session[normalize_session_id(session_id)]
         while True:
             chunk = await queue.get()
             if chunk is None:
