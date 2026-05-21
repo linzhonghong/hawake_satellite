@@ -49,6 +49,17 @@ def handle_subscribe_payload(
     return coordinator.subscribe_downlinks(device_id.strip(), send_event)
 
 
+def unknown_device_message(coordinator: SatelliteCoordinator, device_id: str) -> str:
+    """Build a diagnostic unknown-device message for Android."""
+    registered_clients = ",".join(sorted(coordinator.clients_by_device_id)) or "<none>"
+    configured_entities = ",".join(sorted(coordinator.entities_by_device_id)) or "<none>"
+    return (
+        f"Unknown satellite device: {device_id}; "
+        f"registered_clients={registered_clients}; "
+        f"configured_entities={configured_entities}"
+    )
+
+
 def _connection_id(connection: websocket_api.ActiveConnection) -> str:
     """Return a stable id for this WebSocket connection."""
     return str(getattr(connection, "id", None) or id(connection))
@@ -160,7 +171,7 @@ def ws_wake_detected(
     device_id = msg["device_id"]
     entity = coordinator.entity_for_device(device_id)
     if entity is None:
-        connection.send_error(msg["id"], "unknown_device", "Unknown satellite device")
+        connection.send_error(msg["id"], "unknown_device", unknown_device_message(coordinator, device_id))
         return
     session_id = uuid4().hex
     coordinator.start_session(session_id, device_id)
