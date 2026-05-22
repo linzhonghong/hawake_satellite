@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from asyncio import run
+from dataclasses import dataclass
 
 from custom_components.hawake_satellite.assist_satellite import (
     HAWakeAssistSatelliteEntity,
@@ -19,6 +20,29 @@ from custom_components.hawake_satellite.const import (
 )
 from custom_components.hawake_satellite.coordinator import SatelliteCoordinator
 from custom_components.hawake_satellite.protocol import RegisterMessage
+
+
+@dataclass(frozen=True)
+class EventType:
+    """Small stand-in for HA pipeline event enum values."""
+
+    value: str
+
+
+@dataclass(frozen=True)
+class PipelineEvent:
+    """Small stand-in for HA pipeline events."""
+
+    type: EventType
+    data: dict
+    run_id: str = "run-1"
+
+
+class RunningHass:
+    """Fake hass that executes scheduled coroutines in sync tests."""
+
+    def async_create_task(self, coro):
+        return run(coro)
 
 
 def test_entity_available_when_client_registered() -> None:
@@ -63,6 +87,40 @@ def test_start_audio_capture_queues_downlink() -> None:
 
     assert coordinator.pop_downlinks("android-123") == [
         {"command": "start_audio_capture", "session_id": "session-1"}
+    ]
+
+
+def test_pipeline_tts_event_routes_playback_to_app() -> None:
+    coordinator = SatelliteCoordinator()
+    entity = HAWakeAssistSatelliteEntity(
+        coordinator=coordinator,
+        device_id="android-123",
+        name="Bedroom Phone",
+        data={CONF_PLAYBACK_MODE: PlaybackMode.APP},
+    )
+    entity.hass = RunningHass()
+
+    entity.on_pipeline_event(
+        PipelineEvent(
+            type=EventType("tts-end"),
+            data={
+                "text": "现在是凌晨一点",
+                "tts_output": {
+                    "url": "/api/tts_proxy/abc.mp3",
+                    "mime_type": "audio/mpeg",
+                },
+            },
+            run_id="run-tts-1",
+        )
+    )
+
+    assert coordinator.pop_downlinks("android-123") == [
+        {
+            "command": "play_media",
+            "session_id": "run-tts-1",
+            "media_url": "/api/tts_proxy/abc.mp3",
+            "mime_type": "audio/mpeg",
+        }
     ]
 
 
