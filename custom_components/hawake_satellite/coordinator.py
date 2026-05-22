@@ -57,6 +57,7 @@ class SatelliteCoordinator:
             connection_id=connection_id,
         )
         self.device_id_by_connection[connection_id] = registration.device_id
+        self._refresh_entity_state(registration.device_id)
 
     def disconnect(self, connection_id: str) -> None:
         """Mark the client behind a connection as offline."""
@@ -66,14 +67,18 @@ class SatelliteCoordinator:
         client = self.clients_by_device_id.get(device_id)
         if client is not None and client.connection_id == connection_id:
             client.state = SatelliteClientState.OFFLINE
+            self._refresh_entity_state(device_id)
 
     def update_state(self, device_id: str, state: SatelliteClientState) -> None:
         """Update a connected client's state."""
         self.clients_by_device_id[device_id].state = state
+        self._refresh_entity_state(device_id)
 
     def register_entity(self, device_id: str, entity: Any) -> None:
         """Register the HA entity that represents an Android device."""
         self.entities_by_device_id[device_id] = entity
+        if device_id in self.clients_by_device_id:
+            self._refresh_entity_state(device_id)
 
     def entity_for_device(self, device_id: str) -> Any | None:
         """Return the entity for an Android device."""
@@ -83,6 +88,15 @@ class SatelliteCoordinator:
         """Return the latest known client state."""
         client = self.clients_by_device_id.get(device_id)
         return SatelliteClientState.OFFLINE if client is None else client.state
+
+    def _refresh_entity_state(self, device_id: str) -> None:
+        """Ask Home Assistant to re-read entity availability and state."""
+        entity = self.entities_by_device_id.get(device_id)
+        if entity is None:
+            return
+        write_state = getattr(entity, "async_write_ha_state", None)
+        if write_state is not None:
+            write_state()
 
     def connection_for(self, device_id: str) -> str | None:
         """Return the current HA WebSocket connection id for a device."""

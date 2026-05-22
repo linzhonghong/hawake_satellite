@@ -25,6 +25,16 @@ from custom_components.hawake_satellite.coordinator import (
 from custom_components.hawake_satellite.protocol import RegisterMessage
 
 
+class FakeEntity:
+    """Entity test double that records HA state refresh requests."""
+
+    def __init__(self) -> None:
+        self.write_state_calls = 0
+
+    def async_write_ha_state(self) -> None:
+        self.write_state_calls += 1
+
+
 def test_register_client_marks_device_idle() -> None:
     coordinator = SatelliteCoordinator()
 
@@ -42,6 +52,19 @@ def test_register_client_marks_device_idle() -> None:
     assert coordinator.connection_for("android-123") == "conn-1"
 
 
+def test_register_client_refreshes_registered_entity_state() -> None:
+    coordinator = SatelliteCoordinator()
+    entity = FakeEntity()
+    coordinator.register_entity("android-123", entity)
+
+    coordinator.register_client(
+        RegisterMessage("android-123", "Bedroom Phone", "0.2.0", {}),
+        connection_id="conn-1",
+    )
+
+    assert entity.write_state_calls == 1
+
+
 def test_disconnect_marks_device_offline() -> None:
     coordinator = SatelliteCoordinator()
     coordinator.register_client(
@@ -52,6 +75,34 @@ def test_disconnect_marks_device_offline() -> None:
     coordinator.disconnect("conn-1")
 
     assert coordinator.client_state("android-123") == SatelliteClientState.OFFLINE
+
+
+def test_disconnect_refreshes_registered_entity_state() -> None:
+    coordinator = SatelliteCoordinator()
+    entity = FakeEntity()
+    coordinator.register_entity("android-123", entity)
+    coordinator.register_client(
+        RegisterMessage("android-123", "Bedroom Phone", "0.2.0", {}),
+        connection_id="conn-1",
+    )
+
+    coordinator.disconnect("conn-1")
+
+    assert entity.write_state_calls == 2
+
+
+def test_update_state_refreshes_registered_entity_state() -> None:
+    coordinator = SatelliteCoordinator()
+    entity = FakeEntity()
+    coordinator.register_entity("android-123", entity)
+    coordinator.register_client(
+        RegisterMessage("android-123", "Bedroom Phone", "0.2.0", {}),
+        connection_id="conn-1",
+    )
+
+    coordinator.update_state("android-123", SatelliteClientState.LISTENING)
+
+    assert entity.write_state_calls == 2
 
 
 def test_disconnect_old_connection_does_not_mark_reconnected_device_offline() -> None:
