@@ -53,7 +53,6 @@ from .const import (
     SatelliteClientState,
 )
 from .coordinator import SatelliteCoordinator
-from .pipeline_events import extract_tts_output
 from .playback import PlaybackRequest, PlaybackRouter
 
 
@@ -111,18 +110,7 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
 
     def on_pipeline_event(self, event) -> None:
         """Handle HA Assist pipeline state updates."""
-        tts_output = extract_tts_output(event)
-        if tts_output is None:
-            return
-        session_id = getattr(event, "run_id", None) or uuid4().hex
-        self.hass.async_create_task(
-            self._play_media(
-                session_id=session_id,
-                media_url=tts_output.media_url,
-                mime_type=tts_output.mime_type,
-                response_text=tts_output.response_text,
-            )
-        )
+        return None
 
     async def async_accept_android_wake(self, session_id: str, wake_phrase: str) -> None:
         """Run HA Assist from Android wake-word audio."""
@@ -155,7 +143,7 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
         """Route media playback through the configured playback mode."""
         playback_mode = PlaybackMode(self._data.get(CONF_PLAYBACK_MODE, PlaybackMode.APP))
         self._coordinator.start_session(session_id, self._device_id)
-        await PlaybackRouter(self._coordinator).play(
+        result = await PlaybackRouter(self._coordinator, self.hass).play(
             PlaybackRequest(
                 playback_mode=playback_mode,
                 device_id=self._device_id,
@@ -167,6 +155,17 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
                 playback_script_entity_id=self._data.get(CONF_PLAYBACK_SCRIPT_ENTITY_ID),
             )
         )
+        if result is not None:
+            self.tts_response_finished()
+            self._coordinator.queue_downlink(
+                self._device_id,
+                {
+                    "command": "playback_callback_recorded",
+                    "session_id": result.session_id,
+                    "status": result.status,
+                },
+            )
+            self._coordinator.finish_session(result.session_id)
 
 
 async def async_setup_entry(

@@ -37,12 +37,6 @@ class HAWakeSatelliteConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 and not user_input.get(CONF_MEDIA_PLAYER_ENTITY_ID)
             ):
                 errors[CONF_MEDIA_PLAYER_ENTITY_ID] = "missing_media_player"
-            if (
-                playback_mode is PlaybackMode.AUTOMATION
-                and not user_input.get(CONF_PLAYBACK_SCRIPT_ENTITY_ID)
-            ):
-                errors[CONF_PLAYBACK_SCRIPT_ENTITY_ID] = "missing_script"
-
             if not errors:
                 await self.async_set_unique_id(user_input[CONF_DEVICE_ID])
                 self._abort_if_unique_id_configured()

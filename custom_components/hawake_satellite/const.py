@@ -20,6 +20,8 @@ DEFAULT_PLAYBACK_TIMEOUT_SECONDS: Final = 45
 DEFAULT_RECONNECT_GRACE_SECONDS: Final = 15
 
 SERVICE_PLAYBACK_FINISHED: Final = "playback_finished"
+EVENT_PLAYBACK_REQUESTED: Final = "hawake_satellite_playback_requested"
+CALLBACK_SERVICE_PLAYBACK_FINISHED: Final = "hawake_satellite.playback_finished"
 
 
 class PlaybackMode(StrEnum):

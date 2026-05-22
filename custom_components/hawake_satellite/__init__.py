@@ -46,13 +46,33 @@ def _async_register_services(hass: HomeAssistant) -> None:
     hass.services.async_register(DOMAIN, SERVICE_PLAYBACK_FINISHED, _handle_playback_finished)
 
 
-def handle_playback_finished_callback(coordinator, data: dict[str, Any]) -> None:
+def handle_playback_finished_callback(
+    coordinator,
+    data: dict[str, Any],
+    entity_lookup=None,
+) -> None:
     """Record automation playback completion and finish the owning session."""
+    return _handle_playback_finished_callback(
+        coordinator,
+        data,
+        entity_lookup=entity_lookup or coordinator.entity_for_device,
+    )
+
+
+def _handle_playback_finished_callback(
+    coordinator,
+    data: dict[str, Any],
+    entity_lookup,
+) -> None:
+    """Record playback completion and notify the owning entity."""
     session_id = data["session_id"]
     status = data.get("status", "success")
     device_id = coordinator.device_for_session(session_id)
     if device_id is None:
         return
+    entity = entity_lookup(device_id)
+    if entity is not None:
+        entity.tts_response_finished()
     coordinator.queue_downlink(
         device_id=device_id,
         payload={
