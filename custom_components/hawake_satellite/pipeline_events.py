@@ -35,6 +35,24 @@ def extract_tts_output(event: Any) -> PipelineTtsOutput | None:
     )
 
 
+def extract_response_text(event: Any) -> str:
+    """Extract spoken response text from Assist pipeline events."""
+    event_type = _event_type_value(getattr(event, "type", None))
+    data = getattr(event, "data", None)
+
+    if event_type == "tts-start":
+        return _field(data, "tts_input") or _field(data, "text") or ""
+
+    if event_type == "intent-end":
+        intent_output = _field(data, "intent_output")
+        response = _field(intent_output, "response")
+        speech = _field(response, "speech")
+        plain = _field(speech, "plain")
+        return _field(plain, "speech") or ""
+
+    return ""
+
+
 def _event_type_value(event_type: Any) -> str | None:
     if event_type is None:
         return None

@@ -21,6 +21,7 @@ assert spec.loader is not None
 sys.modules["pipeline_events"] = pipeline_events
 spec.loader.exec_module(pipeline_events)
 extract_tts_output = pipeline_events.extract_tts_output
+extract_response_text = pipeline_events.extract_response_text
 
 
 @dataclass(frozen=True)
@@ -65,3 +66,31 @@ def test_ignores_non_tts_end_events() -> None:
     )
 
     assert extract_tts_output(event) is None
+
+
+def test_extracts_response_text_from_tts_start() -> None:
+    event = PipelineEvent(
+        type=EventType("tts-start"),
+        data={"tts_input": "The living room light is on."},
+    )
+
+    assert extract_response_text(event) == "The living room light is on."
+
+
+def test_extracts_response_text_from_intent_end() -> None:
+    event = PipelineEvent(
+        type=EventType("intent-end"),
+        data={
+            "intent_output": {
+                "response": {
+                    "speech": {
+                        "plain": {
+                            "speech": "It is 9 PM.",
+                        },
+                    },
+                },
+            },
+        },
+    )
+
+    assert extract_response_text(event) == "It is 9 PM."

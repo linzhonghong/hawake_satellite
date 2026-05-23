@@ -14,3 +14,9 @@
 - Fixed OptionsFlow entry creation for real Home Assistant by returning option values through `data`, not an unsupported `options` keyword.
 - Added HAWake Satellite brand icons derived from the Android app icon for Home Assistant and HACS display.
 - Updated WebSocket registration metadata to report the HA entity playback mode instead of always returning `app`.
+- Investigated Automation playback sending `text: ''` to `xiaodu_mcp.speak`.
+- Root cause: real Assist `tts-end` events can contain only TTS media output; the spoken text is emitted earlier in `tts-start` / `intent-end`.
+- Updated Automation mode to trigger playback requests directly from Assist response text events instead of waiting for TTS media output.
+- Kept per-run response-text caching for App / Media player routes that still need `tts-end` media output.
+- Added `hawake_satellite_pipeline_event` so HA automations can freely choose `intent-end`, `tts-start`, or `tts-end`.
+- Added regression tests for response text extraction and Automation event payloads.

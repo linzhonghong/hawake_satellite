@@ -49,11 +49,13 @@ from .const import (
     CONF_PLAYBACK_MODE,
     CONF_PLAYBACK_SCRIPT_ENTITY_ID,
     DOMAIN,
+    CALLBACK_SERVICE_PLAYBACK_FINISHED,
+    EVENT_PIPELINE_STAGE,
     PlaybackMode,
     SatelliteClientState,
 )
 from .coordinator import SatelliteCoordinator
-from .pipeline_events import extract_tts_output
+from .pipeline_events import extract_response_text, extract_tts_output
 from .playback import PlaybackRequest, PlaybackRouter
 
 
@@ -78,6 +80,8 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
         self._data = data or {}
         self._attr_name = name
         self._attr_unique_id = device_id
+        self._response_text_by_run_id: dict[str, str] = {}
+        self._automation_playback_run_ids: set[str] = set()
         self._coordinator.register_entity(device_id, self)
 
     @property
@@ -116,17 +120,81 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
 
     def on_pipeline_event(self, event) -> None:
         """Handle HA Assist pipeline state updates."""
+        run_id = getattr(event, "run_id", None)
+        session_id = run_id or uuid4().hex
+        stage = _event_type_value(getattr(event, "type", None))
+        response_text = extract_response_text(event)
+        if run_id and response_text:
+            self._response_text_by_run_id[run_id] = response_text
         tts_output = extract_tts_output(event)
+        media_url = tts_output.media_url if tts_output is not None else ""
+        mime_type = tts_output.mime_type if tts_output is not None else ""
+        if tts_output is not None and not response_text:
+            response_text = tts_output.response_text or self._response_text_by_run_id.get(
+                session_id, ""
+            )
+        self._fire_pipeline_stage_event(
+            session_id=session_id,
+            stage=stage,
+            media_url=media_url,
+            mime_type=mime_type,
+            response_text=response_text,
+        )
+
+        if response_text and self.playback_mode is PlaybackMode.AUTOMATION:
+            if session_id in self._automation_playback_run_ids:
+                return
+            self._automation_playback_run_ids.add(session_id)
+            self.hass.async_create_task(
+                self._play_media(
+                    session_id=session_id,
+                    media_url="",
+                    mime_type="",
+                    response_text=response_text,
+                )
+            )
+            return
+
         if tts_output is None:
             return
-        session_id = getattr(event, "run_id", None) or uuid4().hex
+        if self.playback_mode is PlaybackMode.AUTOMATION:
+            self._automation_playback_run_ids.discard(session_id)
+            self._response_text_by_run_id.pop(session_id, None)
+            return
+        response_text = tts_output.response_text or self._response_text_by_run_id.pop(
+            session_id, ""
+        )
         self.hass.async_create_task(
             self._play_media(
                 session_id=session_id,
                 media_url=tts_output.media_url,
                 mime_type=tts_output.mime_type,
-                response_text=tts_output.response_text,
+                response_text=response_text,
             )
+        )
+
+    def _fire_pipeline_stage_event(
+        self,
+        session_id: str,
+        stage: str | None,
+        media_url: str,
+        mime_type: str,
+        response_text: str,
+    ) -> None:
+        """Expose Assist pipeline stages to Home Assistant automations."""
+        if stage not in {"intent-end", "tts-start", "tts-end"}:
+            return
+        self.hass.bus.async_fire(
+            EVENT_PIPELINE_STAGE,
+            {
+                "device_id": self._device_id,
+                "session_id": session_id,
+                "stage": stage,
+                "media_url": media_url,
+                "mime_type": mime_type,
+                "response_text": response_text,
+                "callback_service": CALLBACK_SERVICE_PLAYBACK_FINISHED,
+            },
         )
 
     async def async_accept_android_wake(self, session_id: str, wake_phrase: str) -> None:
@@ -202,3 +270,10 @@ async def async_setup_entry(
             )
         ]
     )
+
+
+def _event_type_value(event_type) -> str | None:
+    """Return a normalized Assist pipeline event type."""
+    if event_type is None:
+        return None
+    return getattr(event_type, "value", event_type)

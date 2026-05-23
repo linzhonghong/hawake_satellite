@@ -41,8 +41,21 @@ class PipelineEvent:
 class RunningHass:
     """Fake hass that executes scheduled coroutines in sync tests."""
 
+    def __init__(self) -> None:
+        self.bus = FakeBus()
+
     def async_create_task(self, coro):
         return run(coro)
+
+
+class FakeBus:
+    """Small Home Assistant event bus test double."""
+
+    def __init__(self) -> None:
+        self.events = []
+
+    def async_fire(self, event_type: str, event_data: dict) -> None:
+        self.events.append((event_type, event_data))
 
 
 def test_entity_available_when_client_registered() -> None:
@@ -122,6 +135,194 @@ def test_pipeline_tts_event_routes_playback_to_app() -> None:
             "mime_type": "audio/mpeg",
         }
     ]
+
+
+def test_pipeline_text_event_routes_automation_without_tts_media() -> None:
+    coordinator = SatelliteCoordinator()
+    entity = HAWakeAssistSatelliteEntity(
+        coordinator=coordinator,
+        device_id="android-123",
+        name="Bedroom Phone",
+        data={CONF_PLAYBACK_MODE: PlaybackMode.AUTOMATION},
+    )
+    entity.hass = RunningHass()
+
+    entity.on_pipeline_event(
+        PipelineEvent(
+            type=EventType("intent-end"),
+            data={
+                "intent_output": {
+                    "response": {
+                        "speech": {"plain": {"speech": "It is 9 PM."}},
+                    },
+                },
+            },
+            run_id="run-tts-1",
+        )
+    )
+
+    assert coordinator.pop_downlinks("android-123") == [
+        {"command": "external_playback_started", "session_id": "run-tts-1"}
+    ]
+    assert entity.hass.bus.events == [
+        (
+            "hawake_satellite_pipeline_event",
+            {
+                "device_id": "android-123",
+                "session_id": "run-tts-1",
+                "stage": "intent-end",
+                "media_url": "",
+                "mime_type": "",
+                "response_text": "It is 9 PM.",
+                "callback_service": "hawake_satellite.playback_finished",
+            },
+        ),
+        (
+            "hawake_satellite_playback_requested",
+            {
+                "device_id": "android-123",
+                "session_id": "run-tts-1",
+                "media_url": "",
+                "mime_type": "",
+                "response_text": "It is 9 PM.",
+                "callback_service": "hawake_satellite.playback_finished",
+            },
+        )
+    ]
+
+
+def test_pipeline_stage_event_is_fired_for_ha_automation() -> None:
+    coordinator = SatelliteCoordinator()
+    entity = HAWakeAssistSatelliteEntity(
+        coordinator=coordinator,
+        device_id="android-123",
+        name="Bedroom Phone",
+        data={CONF_PLAYBACK_MODE: PlaybackMode.APP},
+    )
+    entity.hass = RunningHass()
+
+    entity.on_pipeline_event(
+        PipelineEvent(
+            type=EventType("intent-end"),
+            data={
+                "intent_output": {
+                    "response": {
+                        "speech": {"plain": {"speech": "It is 9 PM."}},
+                    },
+                },
+            },
+            run_id="run-tts-1",
+        )
+    )
+
+    assert entity.hass.bus.events == [
+        (
+            "hawake_satellite_pipeline_event",
+            {
+                "device_id": "android-123",
+                "session_id": "run-tts-1",
+                "stage": "intent-end",
+                "media_url": "",
+                "mime_type": "",
+                "response_text": "It is 9 PM.",
+                "callback_service": "hawake_satellite.playback_finished",
+            },
+        )
+    ]
+
+
+def test_pipeline_stage_tts_end_event_includes_cached_response_text() -> None:
+    coordinator = SatelliteCoordinator()
+    entity = HAWakeAssistSatelliteEntity(
+        coordinator=coordinator,
+        device_id="android-123",
+        name="Bedroom Phone",
+        data={CONF_PLAYBACK_MODE: PlaybackMode.APP},
+    )
+    entity.hass = RunningHass()
+
+    entity.on_pipeline_event(
+        PipelineEvent(
+            type=EventType("tts-start"),
+            data={"tts_input": "It is 9 PM."},
+            run_id="run-tts-1",
+        )
+    )
+    entity.hass.bus.events.clear()
+    entity.on_pipeline_event(
+        PipelineEvent(
+            type=EventType("tts-end"),
+            data={
+                "tts_output": {
+                    "url": "/api/tts_proxy/abc.mp3",
+                    "mime_type": "audio/mpeg",
+                },
+            },
+            run_id="run-tts-1",
+        )
+    )
+
+    assert entity.hass.bus.events == [
+        (
+            "hawake_satellite_pipeline_event",
+            {
+                "device_id": "android-123",
+                "session_id": "run-tts-1",
+                "stage": "tts-end",
+                "media_url": "/api/tts_proxy/abc.mp3",
+                "mime_type": "audio/mpeg",
+                "response_text": "It is 9 PM.",
+                "callback_service": "hawake_satellite.playback_finished",
+            },
+        )
+    ]
+
+
+def test_pipeline_tts_end_does_not_duplicate_automation_text_playback() -> None:
+    coordinator = SatelliteCoordinator()
+    entity = HAWakeAssistSatelliteEntity(
+        coordinator=coordinator,
+        device_id="android-123",
+        name="Bedroom Phone",
+        data={CONF_PLAYBACK_MODE: PlaybackMode.AUTOMATION},
+    )
+    entity.hass = RunningHass()
+
+    entity.on_pipeline_event(
+        PipelineEvent(
+            type=EventType("tts-start"),
+            data={"tts_input": "It is 9 PM."},
+            run_id="run-tts-1",
+        )
+    )
+    coordinator.pop_downlinks("android-123")
+
+    entity.on_pipeline_event(
+        PipelineEvent(
+            type=EventType("tts-end"),
+            data={
+                "tts_output": {
+                    "url": "/api/tts_proxy/abc.mp3",
+                    "mime_type": "audio/mpeg",
+                },
+            },
+            run_id="run-tts-1",
+        )
+    )
+
+    assert coordinator.pop_downlinks("android-123") == []
+    playback_events = [
+        event
+        for event in entity.hass.bus.events
+        if event[0] == "hawake_satellite_playback_requested"
+    ]
+    pipeline_events = [
+        event
+        for event in entity.hass.bus.events
+        if event[0] == "hawake_satellite_pipeline_event"
+    ]
+    assert len(playback_events) == 1
+    assert [event[1]["stage"] for event in pipeline_events] == ["tts-start", "tts-end"]
 
 
 def test_async_setup_entry_adds_entity_from_config_entry() -> None:
