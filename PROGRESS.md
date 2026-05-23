@@ -12,3 +12,4 @@
 - Entity setup now applies `entry.options` over `entry.data`, so App / Media player / Automation can be changed from Home Assistant without recreating the integration.
 - Added tests for OptionsFlow updates, media player validation, and options overriding config entry data.
 - Fixed OptionsFlow entry creation for real Home Assistant by returning option values through `data`, not an unsupported `options` keyword.
+- Added HAWake Satellite brand icons derived from the Android app icon for Home Assistant and HACS display.
