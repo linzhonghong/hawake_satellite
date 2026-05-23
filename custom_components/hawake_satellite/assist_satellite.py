@@ -187,13 +187,14 @@ async def async_setup_entry(
 ) -> None:
     """Set up the HAWake Satellite assist satellite platform."""
     coordinator: SatelliteCoordinator = hass.data[DOMAIN][entry.entry_id]["coordinator"]
+    data = {**entry.data, **getattr(entry, "options", {})}
     async_add_entities(
         [
             HAWakeAssistSatelliteEntity(
                 coordinator=coordinator,
-                device_id=entry.data[CONF_DEVICE_ID],
-                name=entry.data[CONF_DEVICE_NAME],
-                data=entry.data,
+                device_id=data[CONF_DEVICE_ID],
+                name=data[CONF_DEVICE_NAME],
+                data=data,
             )
         ]
     )

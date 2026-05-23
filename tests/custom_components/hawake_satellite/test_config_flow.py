@@ -23,8 +23,19 @@ class FakeConfigFlow:
     def _abort_if_unique_id_configured(self) -> None:
         return None
 
-    def async_create_entry(self, *, title: str, data: dict[str, Any]) -> dict[str, Any]:
-        return {"type": "create_entry", "title": title, "data": data}
+    def async_create_entry(
+        self,
+        *,
+        title: str,
+        data: dict[str, Any] | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        result = {"type": "create_entry", "title": title}
+        if data is not None:
+            result["data"] = data
+        if options is not None:
+            result["options"] = options
+        return result
 
     def async_show_form(
         self,
@@ -48,10 +59,15 @@ class FakeSchema:
         self.schema = schema
 
 
+class FakeOptionsFlow(FakeConfigFlow):
+    """Small Home Assistant OptionsFlow stand-in for unit tests."""
+
+
 homeassistant = ModuleType("homeassistant")
 config_entries = ModuleType("homeassistant.config_entries")
 config_entries.ConfigEntry = object
 config_entries.ConfigFlow = FakeConfigFlow
+config_entries.OptionsFlow = FakeOptionsFlow
 core = ModuleType("homeassistant.core")
 core.HomeAssistant = object
 core.ServiceCall = object
@@ -129,3 +145,57 @@ def test_automation_mode_does_not_require_script() -> None:
 
     assert result["type"] == "create_entry"
     assert result["data"][CONF_PLAYBACK_MODE] == PlaybackMode.AUTOMATION
+
+
+def test_options_flow_updates_playback_mode_to_automation() -> None:
+    entry = type(
+        "FakeEntry",
+        (),
+        {
+            "data": {
+                CONF_PLAYBACK_MODE: PlaybackMode.APP,
+                CONF_MEDIA_PLAYER_ENTITY_ID: "media_player.old",
+                CONF_PLAYBACK_SCRIPT_ENTITY_ID: "",
+            },
+            "options": {},
+        },
+    )()
+    flow = HAWakeSatelliteConfigFlow.async_get_options_flow(entry)
+
+    result = run(
+        flow.async_step_init(
+            {
+                CONF_PLAYBACK_MODE: PlaybackMode.AUTOMATION,
+                CONF_MEDIA_PLAYER_ENTITY_ID: "",
+                CONF_PLAYBACK_SCRIPT_ENTITY_ID: "",
+            }
+        )
+    )
+
+    assert result["type"] == "create_entry"
+    assert result["options"][CONF_PLAYBACK_MODE] == PlaybackMode.AUTOMATION
+
+
+def test_options_flow_media_player_mode_requires_entity() -> None:
+    entry = type(
+        "FakeEntry",
+        (),
+        {
+            "data": {CONF_PLAYBACK_MODE: PlaybackMode.APP},
+            "options": {},
+        },
+    )()
+    flow = HAWakeSatelliteConfigFlow.async_get_options_flow(entry)
+
+    result = run(
+        flow.async_step_init(
+            {
+                CONF_PLAYBACK_MODE: PlaybackMode.MEDIA_PLAYER,
+                CONF_MEDIA_PLAYER_ENTITY_ID: "",
+                CONF_PLAYBACK_SCRIPT_ENTITY_ID: "",
+            }
+        )
+    )
+
+    assert result["type"] == "form"
+    assert result["errors"][CONF_MEDIA_PLAYER_ENTITY_ID] == "missing_media_player"

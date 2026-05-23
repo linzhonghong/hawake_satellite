@@ -150,6 +150,33 @@ def test_async_setup_entry_adds_entity_from_config_entry() -> None:
     assert added_entities[0]._attr_unique_id == "android-123"
 
 
+def test_async_setup_entry_applies_options_over_config_entry_data() -> None:
+    coordinator = SatelliteCoordinator()
+    hass = type(
+        "FakeHass",
+        (),
+        {"data": {DOMAIN: {"entry-1": {"coordinator": coordinator}}}},
+    )()
+    entry = type(
+        "FakeEntry",
+        (),
+        {
+            "entry_id": "entry-1",
+            "data": {
+                CONF_DEVICE_ID: "android-123",
+                CONF_DEVICE_NAME: "Bedroom Phone",
+                CONF_PLAYBACK_MODE: PlaybackMode.APP,
+            },
+            "options": {CONF_PLAYBACK_MODE: PlaybackMode.AUTOMATION},
+        },
+    )()
+    added_entities = []
+
+    run(async_setup_entry(hass, entry, added_entities.extend))
+
+    assert added_entities[0]._data[CONF_PLAYBACK_MODE] == PlaybackMode.AUTOMATION
+
+
 def test_media_player_completion_notifies_android() -> None:
     class FakeBus:
         def __init__(self) -> None:
