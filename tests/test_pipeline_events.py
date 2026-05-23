@@ -47,6 +47,7 @@ def test_extracts_tts_end_media_url() -> None:
             "tts_output": {
                 "url": "/api/tts_proxy/abc.mp3",
                 "mime_type": "audio/mpeg",
+                "duration_seconds": 7.5,
             },
         },
     )
@@ -56,6 +57,7 @@ def test_extracts_tts_end_media_url() -> None:
     assert output is not None
     assert output.media_url == "/api/tts_proxy/abc.mp3"
     assert output.mime_type == "audio/mpeg"
+    assert output.duration_seconds == 7.5
     assert output.response_text == "现在是凌晨一点"
 
 

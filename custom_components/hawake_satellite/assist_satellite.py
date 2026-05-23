@@ -55,6 +55,7 @@ from .const import (
     SatelliteClientState,
 )
 from .coordinator import SatelliteCoordinator
+from .media_duration import async_probe_media_duration_seconds
 from .pipeline_events import extract_response_text, extract_tts_output
 from .playback import PlaybackRequest, PlaybackRouter
 
@@ -129,16 +130,20 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
         tts_output = extract_tts_output(event)
         media_url = tts_output.media_url if tts_output is not None else ""
         mime_type = tts_output.mime_type if tts_output is not None else ""
+        duration_seconds = (
+            tts_output.duration_seconds if tts_output is not None else None
+        )
         if tts_output is not None and not response_text:
             response_text = tts_output.response_text or self._response_text_by_run_id.get(
                 session_id, ""
             )
-        self._fire_pipeline_stage_event(
+        self._schedule_pipeline_stage_event(
             session_id=session_id,
             stage=stage,
             media_url=media_url,
             mime_type=mime_type,
             response_text=response_text,
+            duration_seconds=duration_seconds,
         )
 
         if response_text and self.playback_mode is PlaybackMode.AUTOMATION:
@@ -173,17 +178,69 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
             )
         )
 
-    def _fire_pipeline_stage_event(
+    def _schedule_pipeline_stage_event(
         self,
         session_id: str,
         stage: str | None,
         media_url: str,
         mime_type: str,
         response_text: str,
+        duration_seconds: float | None,
     ) -> None:
         """Expose Assist pipeline stages to Home Assistant automations."""
         if stage not in {"intent-end", "tts-start", "tts-end"}:
             return
+        if stage == "tts-end" and duration_seconds is None and media_url:
+            self.hass.async_create_task(
+                self._async_fire_tts_end_stage_event(
+                    session_id=session_id,
+                    stage=stage,
+                    media_url=media_url,
+                    mime_type=mime_type,
+                    response_text=response_text,
+                )
+            )
+            return
+        self._fire_pipeline_stage_event(
+            session_id=session_id,
+            stage=stage,
+            media_url=media_url,
+            mime_type=mime_type,
+            response_text=response_text,
+            duration_seconds=duration_seconds,
+        )
+
+    async def _async_fire_tts_end_stage_event(
+        self,
+        session_id: str,
+        stage: str,
+        media_url: str,
+        mime_type: str,
+        response_text: str,
+    ) -> None:
+        """Probe TTS media duration before publishing the tts-end stage event."""
+        duration_seconds = await async_probe_media_duration_seconds(
+            self.hass, media_url, mime_type
+        )
+        self._fire_pipeline_stage_event(
+            session_id=session_id,
+            stage=stage,
+            media_url=media_url,
+            mime_type=mime_type,
+            response_text=response_text,
+            duration_seconds=duration_seconds,
+        )
+
+    def _fire_pipeline_stage_event(
+        self,
+        session_id: str,
+        stage: str,
+        media_url: str,
+        mime_type: str,
+        response_text: str,
+        duration_seconds: float | None,
+    ) -> None:
+        """Fire a Home Assistant event for an Assist pipeline stage."""
         self.hass.bus.async_fire(
             EVENT_PIPELINE_STAGE,
             {
@@ -193,6 +250,7 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
                 "media_url": media_url,
                 "mime_type": mime_type,
                 "response_text": response_text,
+                "duration_seconds": duration_seconds,
                 "callback_service": CALLBACK_SERVICE_PLAYBACK_FINISHED,
             },
         )

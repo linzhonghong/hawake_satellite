@@ -20,3 +20,5 @@
 - Kept per-run response-text caching for App / Media player routes that still need `tts-end` media output.
 - Added `hawake_satellite_pipeline_event` so HA automations can freely choose `intent-end`, `tts-start`, or `tts-end`.
 - Added regression tests for response text extraction and Automation event payloads.
+- Added best-effort TTS media duration probing for `tts-end` pipeline events.
+- Planned Automation timing around `duration_seconds + buffer`, with text-length fallback when TTS is disabled, slow, or duration probing fails.

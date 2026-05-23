@@ -174,6 +174,7 @@ def test_pipeline_text_event_routes_automation_without_tts_media() -> None:
                 "media_url": "",
                 "mime_type": "",
                 "response_text": "It is 9 PM.",
+                "duration_seconds": None,
                 "callback_service": "hawake_satellite.playback_finished",
             },
         ),
@@ -225,6 +226,7 @@ def test_pipeline_stage_event_is_fired_for_ha_automation() -> None:
                 "media_url": "",
                 "mime_type": "",
                 "response_text": "It is 9 PM.",
+                "duration_seconds": None,
                 "callback_service": "hawake_satellite.playback_finished",
             },
         )
@@ -256,6 +258,7 @@ def test_pipeline_stage_tts_end_event_includes_cached_response_text() -> None:
                 "tts_output": {
                     "url": "/api/tts_proxy/abc.mp3",
                     "mime_type": "audio/mpeg",
+                    "duration_seconds": 2.5,
                 },
             },
             run_id="run-tts-1",
@@ -272,6 +275,7 @@ def test_pipeline_stage_tts_end_event_includes_cached_response_text() -> None:
                 "media_url": "/api/tts_proxy/abc.mp3",
                 "mime_type": "audio/mpeg",
                 "response_text": "It is 9 PM.",
+                "duration_seconds": 2.5,
                 "callback_service": "hawake_satellite.playback_finished",
             },
         )

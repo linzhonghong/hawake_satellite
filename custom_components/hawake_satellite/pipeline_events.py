@@ -13,6 +13,7 @@ class PipelineTtsOutput:
     media_url: str
     mime_type: str
     response_text: str = ""
+    duration_seconds: float | None = None
 
 
 def extract_tts_output(event: Any) -> PipelineTtsOutput | None:
@@ -32,6 +33,7 @@ def extract_tts_output(event: Any) -> PipelineTtsOutput | None:
         or _field(tts_output, "media_type")
         or "audio/mpeg",
         response_text=_field(data, "text") or "",
+        duration_seconds=_duration_seconds(tts_output),
     )
 
 
@@ -65,3 +67,17 @@ def _field(value: Any, field_name: str) -> Any:
     if isinstance(value, dict):
         return value.get(field_name)
     return getattr(value, field_name, None)
+
+
+def _duration_seconds(tts_output: Any) -> float | None:
+    value = (
+        _field(tts_output, "duration_seconds")
+        or _field(tts_output, "duration")
+        or _field(tts_output, "audio_duration")
+    )
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
