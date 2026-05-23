@@ -29,10 +29,20 @@ class FakeEntity:
     """Entity test double that records HA state refresh requests."""
 
     def __init__(self) -> None:
+        self.hass = object()
         self.write_state_calls = 0
 
     def async_write_ha_state(self) -> None:
         self.write_state_calls += 1
+
+
+class PendingEntity:
+    """Entity test double that has not been added to Home Assistant yet."""
+
+    hass = None
+
+    def async_write_ha_state(self) -> None:
+        raise RuntimeError("State should not be written before hass is set")
 
 
 def test_register_client_marks_device_idle() -> None:
@@ -63,6 +73,18 @@ def test_register_client_refreshes_registered_entity_state() -> None:
     )
 
     assert entity.write_state_calls == 1
+
+
+def test_register_entity_defers_refresh_until_entity_is_added_to_hass() -> None:
+    coordinator = SatelliteCoordinator()
+    coordinator.register_client(
+        RegisterMessage("android-123", "Bedroom Phone", "0.2.0", {}),
+        connection_id="conn-1",
+    )
+
+    coordinator.register_entity("android-123", PendingEntity())
+
+    assert coordinator.entity_for_device("android-123") is not None
 
 
 def test_disconnect_marks_device_offline() -> None:

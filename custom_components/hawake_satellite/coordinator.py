@@ -94,6 +94,8 @@ class SatelliteCoordinator:
         entity = self.entities_by_device_id.get(device_id)
         if entity is None:
             return
+        if hasattr(entity, "hass") and entity.hass is None:
+            return
         write_state = getattr(entity, "async_write_ha_state", None)
         if write_state is not None:
             write_state()
