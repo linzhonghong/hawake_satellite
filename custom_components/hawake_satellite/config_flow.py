@@ -76,7 +76,7 @@ class HAWakeSatelliteOptionsFlow(config_entries.OptionsFlow):
             ):
                 errors[CONF_MEDIA_PLAYER_ENTITY_ID] = "missing_media_player"
             if not errors:
-                return self.async_create_entry(title="", data={}, options=user_input)
+                return self.async_create_entry(title="", data=user_input)
 
         defaults = {
             **self._config_entry.data,

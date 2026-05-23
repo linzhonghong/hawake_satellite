@@ -28,13 +28,10 @@ class FakeConfigFlow:
         *,
         title: str,
         data: dict[str, Any] | None = None,
-        options: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         result = {"type": "create_entry", "title": title}
         if data is not None:
             result["data"] = data
-        if options is not None:
-            result["options"] = options
         return result
 
     def async_show_form(
@@ -173,7 +170,7 @@ def test_options_flow_updates_playback_mode_to_automation() -> None:
     )
 
     assert result["type"] == "create_entry"
-    assert result["options"][CONF_PLAYBACK_MODE] == PlaybackMode.AUTOMATION
+    assert result["data"][CONF_PLAYBACK_MODE] == PlaybackMode.AUTOMATION
 
 
 def test_options_flow_media_player_mode_requires_entity() -> None:
