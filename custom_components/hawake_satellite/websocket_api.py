@@ -24,9 +24,12 @@ def handle_register_payload(
     """Register an Android satellite client and return HA metadata."""
     registration = parse_register_message(payload)
     coordinator.register_client(registration, connection_id)
+    entity = coordinator.entity_for_device(registration.device_id)
+    playback_mode = getattr(entity, "playback_mode", None)
+    playback_mode = getattr(playback_mode, "value", playback_mode) or "app"
     return {
         "satellite_entity_id": f"assist_satellite.{registration.name.lower().replace(' ', '_')}",
-        "playback_mode": "app",
+        "playback_mode": playback_mode,
         "pipeline_id": "preferred",
     }
 

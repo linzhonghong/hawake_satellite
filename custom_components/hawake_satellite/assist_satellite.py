@@ -85,6 +85,11 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
         """Return if the Android client is connected."""
         return self._coordinator.client_state(self._device_id) is not SatelliteClientState.OFFLINE
 
+    @property
+    def playback_mode(self) -> PlaybackMode:
+        """Return the configured response playback mode."""
+        return PlaybackMode(self._data.get(CONF_PLAYBACK_MODE, PlaybackMode.APP))
+
     async def async_start_audio_capture(self, session_id: str) -> None:
         """Ask Android to begin microphone capture for a session."""
         self._coordinator.queue_downlink(
@@ -153,11 +158,10 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
         response_text: str,
     ) -> None:
         """Route media playback through the configured playback mode."""
-        playback_mode = PlaybackMode(self._data.get(CONF_PLAYBACK_MODE, PlaybackMode.APP))
         self._coordinator.start_session(session_id, self._device_id)
         result = await PlaybackRouter(self._coordinator, self.hass).play(
             PlaybackRequest(
-                playback_mode=playback_mode,
+                playback_mode=self.playback_mode,
                 device_id=self._device_id,
                 session_id=session_id,
                 media_url=media_url,

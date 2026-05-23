@@ -51,6 +51,7 @@ sys.modules["homeassistant.core"] = core
 sys.modules["voluptuous"] = voluptuous
 
 from custom_components.hawake_satellite.const import SatelliteClientState
+from custom_components.hawake_satellite.const import CONF_PLAYBACK_MODE, PlaybackMode
 from custom_components.hawake_satellite.coordinator import SatelliteCoordinator
 import custom_components.hawake_satellite.websocket_api as websocket_api
 from custom_components.hawake_satellite.websocket_api import (
@@ -79,6 +80,25 @@ def test_handle_register_payload_returns_entity_metadata() -> None:
     assert result["satellite_entity_id"] == "assist_satellite.bedroom_phone"
     assert result["playback_mode"] == "app"
     assert coordinator.client_state("android-123") == SatelliteClientState.IDLE
+
+
+def test_handle_register_payload_returns_entity_playback_mode() -> None:
+    coordinator = SatelliteCoordinator()
+    entity = type("FakeEntity", (), {"playback_mode": PlaybackMode.AUTOMATION})()
+    coordinator.register_entity("android-123", entity)
+
+    result = handle_register_payload(
+        coordinator,
+        {
+            "device_id": "android-123",
+            "name": "Bedroom Phone",
+            "app_version": "0.2.0",
+            "capabilities": {"wake_word": True},
+        },
+        connection_id="conn-1",
+    )
+
+    assert result["playback_mode"] == "automation"
 
 
 def test_ws_register_accepts_connections_without_id() -> None:

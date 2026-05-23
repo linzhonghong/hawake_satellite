@@ -13,3 +13,4 @@
 - Added tests for OptionsFlow updates, media player validation, and options overriding config entry data.
 - Fixed OptionsFlow entry creation for real Home Assistant by returning option values through `data`, not an unsupported `options` keyword.
 - Added HAWake Satellite brand icons derived from the Android app icon for Home Assistant and HACS display.
+- Updated WebSocket registration metadata to report the HA entity playback mode instead of always returning `app`.
