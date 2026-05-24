@@ -22,3 +22,4 @@
 - Added regression tests for response text extraction and Automation event payloads.
 - Added best-effort TTS media duration probing for `tts-end` pipeline events.
 - Planned Automation timing around `duration_seconds + buffer`, with text-length fallback when TTS is disabled, slow, or duration probing fails.
+- Added `playback_mode` to `hawake_satellite_pipeline_event` so HA automations can ignore App / Media player playback modes.

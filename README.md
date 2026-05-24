@@ -31,6 +31,8 @@ Listen for `hawake_satellite_pipeline_event` and filter `trigger.event.data.stag
 - `tts-start`: TTS input text is available in `trigger.event.data.response_text`.
 - `tts-end`: TTS media is available in `trigger.event.data.media_url` and `trigger.event.data.mime_type`; `trigger.event.data.duration_seconds` is included when the duration can be inferred.
 
+The event also includes `trigger.event.data.playback_mode`. Automations that perform playback should guard on `playback_mode == "automation"` so they do not also run while App or Media player mode owns playback.
+
 For text-only speakers such as `xiaodu_mcp.speak`, prefer `intent-end`. After the automation finishes playback, call `hawake_satellite.playback_finished` with `session_id: "{{ trigger.event.data.session_id }}"`.
 
 For safer continuous conversation timing, start the text speaker from `intent-end`, then optionally wait for the matching `tts-end` event. If `duration_seconds` is present, use it plus a buffer; otherwise fall back to a text-length estimate with configurable minimum and maximum wait seconds.

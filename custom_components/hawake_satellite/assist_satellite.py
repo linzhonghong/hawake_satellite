@@ -247,6 +247,7 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
                 "device_id": self._device_id,
                 "session_id": session_id,
                 "stage": stage,
+                "playback_mode": self.playback_mode.value,
                 "media_url": media_url,
                 "mime_type": mime_type,
                 "response_text": response_text,
