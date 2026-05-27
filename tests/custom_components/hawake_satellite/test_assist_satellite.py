@@ -133,6 +133,7 @@ def test_pipeline_tts_event_routes_playback_to_app() -> None:
             "session_id": "run-tts-1",
             "media_url": "/api/tts_proxy/abc.mp3",
             "mime_type": "audio/mpeg",
+            "response_text": "现在是凌晨一点",
         }
     ]
 
@@ -162,6 +163,12 @@ def test_pipeline_text_event_routes_automation_without_tts_media() -> None:
     )
 
     assert coordinator.pop_downlinks("android-123") == [
+        {
+            "command": "conversation_message",
+            "session_id": "run-tts-1",
+            "speaker": "assistant",
+            "text": "It is 9 PM.",
+        },
         {"command": "external_playback_started", "session_id": "run-tts-1"}
     ]
     assert entity.hass.bus.events == [
@@ -232,6 +239,34 @@ def test_pipeline_stage_event_is_fired_for_ha_automation() -> None:
                 "callback_service": "hawake_satellite.playback_finished",
             },
         )
+    ]
+
+
+def test_pipeline_stt_end_downlinks_user_conversation_message() -> None:
+    coordinator = SatelliteCoordinator()
+    entity = HAWakeAssistSatelliteEntity(
+        coordinator=coordinator,
+        device_id="android-123",
+        name="Bedroom Phone",
+        data={CONF_PLAYBACK_MODE: PlaybackMode.APP},
+    )
+    entity.hass = RunningHass()
+
+    entity.on_pipeline_event(
+        PipelineEvent(
+            type=EventType("stt-end"),
+            data={"stt_output": {"text": "Turn on the light"}},
+            run_id="run-stt-1",
+        )
+    )
+
+    assert coordinator.pop_downlinks("android-123") == [
+        {
+            "command": "conversation_message",
+            "session_id": "run-stt-1",
+            "speaker": "user",
+            "text": "Turn on the light",
+        }
     ]
 
 

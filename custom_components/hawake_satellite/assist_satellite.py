@@ -56,7 +56,7 @@ from .const import (
 )
 from .coordinator import SatelliteCoordinator
 from .media_duration import async_probe_media_duration_seconds
-from .pipeline_events import extract_response_text, extract_tts_output
+from .pipeline_events import extract_response_text, extract_stt_text, extract_tts_output
 from .playback import PlaybackRequest, PlaybackRouter
 
 
@@ -124,9 +124,14 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
         run_id = getattr(event, "run_id", None)
         session_id = run_id or uuid4().hex
         stage = _event_type_value(getattr(event, "type", None))
+        stt_text = extract_stt_text(event)
+        if stt_text:
+            self._queue_conversation_message(session_id, "user", stt_text)
         response_text = extract_response_text(event)
         if run_id and response_text:
             self._response_text_by_run_id[run_id] = response_text
+        if response_text:
+            self._queue_conversation_message(session_id, "assistant", response_text)
         tts_output = extract_tts_output(event)
         media_url = tts_output.media_url if tts_output is not None else ""
         mime_type = tts_output.mime_type if tts_output is not None else ""
@@ -309,6 +314,23 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
                 },
             )
             self._coordinator.finish_session(result.session_id)
+
+    def _queue_conversation_message(
+        self,
+        session_id: str,
+        speaker: str,
+        text: str,
+    ) -> None:
+        """Send live conversation text to the Android UI."""
+        self._coordinator.queue_downlink(
+            self._device_id,
+            {
+                "command": "conversation_message",
+                "session_id": session_id,
+                "speaker": speaker,
+                "text": text,
+            },
+        )
 
 
 async def async_setup_entry(

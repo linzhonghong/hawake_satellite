@@ -130,6 +130,7 @@ def test_app_playback_queues_play_media() -> None:
                 "session_id": "s1",
                 "media_url": "/api/hawake_satellite/tts/s1",
                 "mime_type": "audio/mpeg",
+                "response_text": "OK",
             },
         )
     ]

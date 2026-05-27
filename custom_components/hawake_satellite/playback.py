@@ -52,6 +52,7 @@ class PlaybackRouter:
                     "session_id": request.session_id,
                     "media_url": request.media_url,
                     "mime_type": request.mime_type,
+                    "response_text": request.response_text,
                 },
             )
             return

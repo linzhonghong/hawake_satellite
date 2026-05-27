@@ -22,6 +22,7 @@ sys.modules["pipeline_events"] = pipeline_events
 spec.loader.exec_module(pipeline_events)
 extract_tts_output = pipeline_events.extract_tts_output
 extract_response_text = pipeline_events.extract_response_text
+extract_stt_text = pipeline_events.extract_stt_text
 
 
 @dataclass(frozen=True)
@@ -96,3 +97,12 @@ def test_extracts_response_text_from_intent_end() -> None:
     )
 
     assert extract_response_text(event) == "It is 9 PM."
+
+
+def test_extracts_stt_text_from_stt_end() -> None:
+    event = PipelineEvent(
+        type=EventType("stt-end"),
+        data={"stt_output": {"text": "Turn on the light"}},
+    )
+
+    assert extract_stt_text(event) == "Turn on the light"

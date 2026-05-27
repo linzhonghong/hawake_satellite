@@ -55,6 +55,16 @@ def extract_response_text(event: Any) -> str:
     return ""
 
 
+def extract_stt_text(event: Any) -> str:
+    """Extract recognized user speech from Assist pipeline events."""
+    if _event_type_value(getattr(event, "type", None)) != "stt-end":
+        return ""
+
+    data = getattr(event, "data", None)
+    stt_output = _field(data, "stt_output")
+    return _field(stt_output, "text") or ""
+
+
 def _event_type_value(event_type: Any) -> str | None:
     if event_type is None:
         return None

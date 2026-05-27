@@ -2,6 +2,11 @@
 
 ## 2026-05-23
 
+- Added 0.2.16 live conversation downlink support for Android.
+- Extracts Assist `stt-end` text and sends recognized user speech as `conversation_message`.
+- Sends Assist response text from `intent-end` / `tts-start` as assistant `conversation_message`.
+- Includes `response_text` in App playback `play_media` downlinks.
+- Verification: `python -m pytest tests/test_pipeline_events.py tests/custom_components/hawake_satellite/test_playback.py tests/custom_components/hawake_satellite/test_assist_satellite.py` passed with 24 tests.
 - Investigated no-speaker closed-loop validation failure.
 - Found `assist_satellite.rong_yao` was a restored orphan entity because the platform failed during setup.
 - Root cause: `SatelliteCoordinator.register_entity()` refreshed entity state before Home Assistant had attached `hass` to the entity.
