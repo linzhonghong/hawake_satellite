@@ -84,6 +84,7 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
         self._response_text_by_run_id: dict[str, str] = {}
         self._conversation_message_keys_by_run_id: dict[str, set[tuple[str, str]]] = {}
         self._automation_playback_run_ids: set[str] = set()
+        self._active_android_session_id: str | None = None
         self._coordinator.register_entity(device_id, self)
 
     @property
@@ -123,14 +124,14 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
     def on_pipeline_event(self, event) -> None:
         """Handle HA Assist pipeline state updates."""
         run_id = getattr(event, "run_id", None)
-        session_id = run_id or uuid4().hex
+        session_id = self._active_android_session_id or run_id or uuid4().hex
         stage = _event_type_value(getattr(event, "type", None))
         stt_text = extract_stt_text(event)
         if stt_text:
             self._queue_pipeline_conversation_message(session_id, "user", stt_text)
         response_text = extract_response_text(event)
-        if run_id and response_text:
-            self._response_text_by_run_id[run_id] = response_text
+        if response_text:
+            self._response_text_by_run_id[session_id] = response_text
         if response_text:
             self._queue_pipeline_conversation_message(session_id, "assistant", response_text)
         tts_output = extract_tts_output(event)
@@ -267,10 +268,15 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
     async def async_accept_android_wake(self, session_id: str, wake_phrase: str) -> None:
         """Run HA Assist from Android wake-word audio."""
         await self.async_start_audio_capture(session_id)
-        await self.async_accept_pipeline_from_satellite(
-            self._coordinator.audio_stream(session_id),
-            wake_word_phrase=wake_phrase,
-        )
+        previous_session_id = self._active_android_session_id
+        self._active_android_session_id = session_id
+        try:
+            await self.async_accept_pipeline_from_satellite(
+                self._coordinator.audio_stream(session_id),
+                wake_word_phrase=wake_phrase,
+            )
+        finally:
+            self._active_android_session_id = previous_session_id
 
     async def async_announce(self, announcement: AssistSatelliteAnnouncement) -> None:
         """Play an announcement through the configured playback route."""

@@ -48,6 +48,19 @@ class RunningHass:
         return run(coro)
 
 
+class AsyncTaskHass:
+    """Fake hass that schedules coroutines on the current async test loop."""
+
+    def __init__(self) -> None:
+        self.bus = FakeBus()
+        self.tasks = []
+
+    def async_create_task(self, coro):
+        task = asyncio.create_task(coro)
+        self.tasks.append(task)
+        return task
+
+
 class FakeBus:
     """Small Home Assistant event bus test double."""
 
@@ -100,6 +113,76 @@ def test_start_audio_capture_queues_downlink() -> None:
 
     assert coordinator.pop_downlinks("android-123") == [
         {"command": "start_audio_capture", "session_id": "session-1"}
+    ]
+
+
+def test_android_wake_pipeline_downlinks_keep_android_session_id() -> None:
+    coordinator = SatelliteCoordinator()
+    coordinator.start_session("android-session-1", "android-123")
+    entity = HAWakeAssistSatelliteEntity(
+        coordinator=coordinator,
+        device_id="android-123",
+        name="Bedroom Phone",
+        data={CONF_PLAYBACK_MODE: PlaybackMode.APP},
+    )
+    entity.hass = AsyncTaskHass()
+
+    async def fake_pipeline(_audio_stream, wake_word_phrase: str) -> None:
+        assert wake_word_phrase == "wake"
+        entity.on_pipeline_event(
+            PipelineEvent(
+                type=EventType("stt-end"),
+                data={"stt_output": {"text": "What time is it?"}},
+                run_id=None,
+            )
+        )
+        entity.on_pipeline_event(
+            PipelineEvent(
+                type=EventType("tts-start"),
+                data={"tts_input": "It is 9 PM."},
+                run_id="ha-run-text",
+            )
+        )
+        entity.on_pipeline_event(
+            PipelineEvent(
+                type=EventType("tts-end"),
+                data={
+                    "tts_output": {
+                        "url": "/api/tts_proxy/abc.mp3",
+                        "mime_type": "audio/mpeg",
+                        "duration_seconds": 2.0,
+                    },
+                },
+                run_id="ha-run-media",
+            )
+        )
+        await asyncio.gather(*entity.hass.tasks)
+
+    entity.async_accept_pipeline_from_satellite = fake_pipeline
+
+    run(entity.async_accept_android_wake("android-session-1", "wake"))
+
+    assert coordinator.pop_downlinks("android-123") == [
+        {"command": "start_audio_capture", "session_id": "android-session-1"},
+        {
+            "command": "conversation_message",
+            "session_id": "android-session-1",
+            "speaker": "user",
+            "text": "What time is it?",
+        },
+        {
+            "command": "conversation_message",
+            "session_id": "android-session-1",
+            "speaker": "assistant",
+            "text": "It is 9 PM.",
+        },
+        {
+            "command": "play_media",
+            "session_id": "android-session-1",
+            "media_url": "/api/tts_proxy/abc.mp3",
+            "mime_type": "audio/mpeg",
+            "response_text": "It is 9 PM.",
+        },
     ]
 
 

@@ -1,5 +1,14 @@
 # HAWake Satellite Progress
 
+## 2026-05-29
+
+- Fixed Android wake pipeline session correlation for `0.2.18`.
+- Root cause: HACS used HA pipeline `run_id` as the Android downlink `session_id`, and generated a fresh UUID when `run_id` was absent. On this HA build, related pipeline events can report different or missing `run_id` values, so Android saw different session ids for `start_audio_capture`, `conversation_message`, and `play_media`.
+- Android wake runs now pin pipeline events to the original Android session id created by `hawake_satellite/wake_detected`.
+- Response text caching, conversation dedupe, pipeline stage events, App playback, and playback callbacks now use that same Android session id during a wake-triggered conversation.
+- Added regression coverage for mixed/missing HA `run_id` values during one Android wake conversation.
+- Verification: `python -m pytest -q` passed with 64 tests.
+
 ## 2026-05-23
 
 - Added 0.2.17 conversation downlink dedupe so `intent-end` and `tts-start` do not send duplicate assistant `conversation_message` payloads.
