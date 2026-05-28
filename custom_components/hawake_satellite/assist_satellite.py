@@ -82,6 +82,7 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
         self._attr_name = name
         self._attr_unique_id = device_id
         self._response_text_by_run_id: dict[str, str] = {}
+        self._conversation_message_keys_by_run_id: dict[str, set[tuple[str, str]]] = {}
         self._automation_playback_run_ids: set[str] = set()
         self._coordinator.register_entity(device_id, self)
 
@@ -126,12 +127,12 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
         stage = _event_type_value(getattr(event, "type", None))
         stt_text = extract_stt_text(event)
         if stt_text:
-            self._queue_conversation_message(session_id, "user", stt_text)
+            self._queue_pipeline_conversation_message(session_id, "user", stt_text)
         response_text = extract_response_text(event)
         if run_id and response_text:
             self._response_text_by_run_id[run_id] = response_text
         if response_text:
-            self._queue_conversation_message(session_id, "assistant", response_text)
+            self._queue_pipeline_conversation_message(session_id, "assistant", response_text)
         tts_output = extract_tts_output(event)
         media_url = tts_output.media_url if tts_output is not None else ""
         mime_type = tts_output.mime_type if tts_output is not None else ""
@@ -170,10 +171,12 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
         if self.playback_mode is PlaybackMode.AUTOMATION:
             self._automation_playback_run_ids.discard(session_id)
             self._response_text_by_run_id.pop(session_id, None)
+            self._conversation_message_keys_by_run_id.pop(session_id, None)
             return
         response_text = tts_output.response_text or self._response_text_by_run_id.pop(
             session_id, ""
         )
+        self._conversation_message_keys_by_run_id.pop(session_id, None)
         self.hass.async_create_task(
             self._play_media(
                 session_id=session_id,
@@ -314,6 +317,20 @@ class HAWakeAssistSatelliteEntity(AssistSatelliteEntity):
                 },
             )
             self._coordinator.finish_session(result.session_id)
+
+    def _queue_pipeline_conversation_message(
+        self,
+        session_id: str,
+        speaker: str,
+        text: str,
+    ) -> None:
+        """Send one live conversation message per speaker/text pair in a run."""
+        key = (speaker, text)
+        seen_keys = self._conversation_message_keys_by_run_id.setdefault(session_id, set())
+        if key in seen_keys:
+            return
+        seen_keys.add(key)
+        self._queue_conversation_message(session_id, speaker, text)
 
     def _queue_conversation_message(
         self,

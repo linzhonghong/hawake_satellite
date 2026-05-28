@@ -270,6 +270,47 @@ def test_pipeline_stt_end_downlinks_user_conversation_message() -> None:
     ]
 
 
+def test_pipeline_response_text_downlinks_assistant_conversation_message_once() -> None:
+    coordinator = SatelliteCoordinator()
+    entity = HAWakeAssistSatelliteEntity(
+        coordinator=coordinator,
+        device_id="android-123",
+        name="Bedroom Phone",
+        data={CONF_PLAYBACK_MODE: PlaybackMode.APP},
+    )
+    entity.hass = RunningHass()
+
+    entity.on_pipeline_event(
+        PipelineEvent(
+            type=EventType("intent-end"),
+            data={
+                "intent_output": {
+                    "response": {
+                        "speech": {"plain": {"speech": "It is 9 PM."}},
+                    },
+                },
+            },
+            run_id="run-tts-1",
+        )
+    )
+    entity.on_pipeline_event(
+        PipelineEvent(
+            type=EventType("tts-start"),
+            data={"tts_input": "It is 9 PM."},
+            run_id="run-tts-1",
+        )
+    )
+
+    assert coordinator.pop_downlinks("android-123") == [
+        {
+            "command": "conversation_message",
+            "session_id": "run-tts-1",
+            "speaker": "assistant",
+            "text": "It is 9 PM.",
+        }
+    ]
+
+
 def test_pipeline_stage_tts_end_event_includes_cached_response_text() -> None:
     coordinator = SatelliteCoordinator()
     entity = HAWakeAssistSatelliteEntity(

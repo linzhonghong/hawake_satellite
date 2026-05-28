@@ -2,6 +2,8 @@
 
 ## 2026-05-23
 
+- Added 0.2.17 conversation downlink dedupe so `intent-end` and `tts-start` do not send duplicate assistant `conversation_message` payloads.
+- Bumped HACS integration manifest version to `0.2.17`.
 - Added 0.2.16 live conversation downlink support for Android.
 - Extracts Assist `stt-end` text and sends recognized user speech as `conversation_message`.
 - Sends Assist response text from `intent-end` / `tts-start` as assistant `conversation_message`.
